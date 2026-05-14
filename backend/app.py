@@ -9,7 +9,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///securevault.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wonderofvault.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'super-secret-vault-key-2026' # Change in production
 
@@ -112,7 +112,19 @@ def get_credentials(current_user):
     
     return jsonify(output)
 
+@app.route('/api/credentials/<int:id>', methods=['DELETE'])
+@token_required
+def delete_credential(current_user, id):
+    cred = Credential.query.filter_by(id=id, user_id=current_user.id).first()
+    if not cred:
+        return jsonify({'message': 'Credential not found'}), 404
+    
+    db.session.delete(cred)
+    db.session.commit()
+    return jsonify({'message': 'Credential deleted successfully'})
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True, port=5000)
+    # Change this line:
+    app.run(debug=True, port=5000, host='0.0.0.0')
