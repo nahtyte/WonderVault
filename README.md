@@ -1,6 +1,6 @@
-# 🔐 WonderVault
+# 🔐 Wonder Of You
 
-WonderVault is a full-stack password manager project built with a Python Flask backend and a modern React frontend. It demonstrates hybrid encryption using AES-GCM for payload confidentiality and RSA key wrapping for secure key management.
+Wonder Of You is a full-stack password manager project built with a Python Flask backend and a modern React frontend. It demonstrates hybrid encryption using AES-GCM for payload confidentiality and RSA key wrapping for secure key management.
 
 ## 📁 Repository Structure
 
@@ -84,7 +84,7 @@ The backend exposes these core endpoints:
 
 - The current backend stores RSA private keys in plaintext within the database. This is acceptable for development/demo use but should be encrypted at rest in production.
 - `app.py` uses a hard-coded `SECRET_KEY` for JWT signing. Replace it with an environment variable before deploying.
-- The SQLite database file is created at `backend/wonderofvault.db`.
+- The SQLite database file is created at `backend/wonderofyou.db`.
 
 ## 🧩 Tools & Dependencies
 
@@ -108,6 +108,6 @@ The backend exposes these core endpoints:
 
 ## 💡 Notes
 
-If you want to reset the backend database, delete `backend/wonderofvault.db` and restart the Flask server.
+If you want to reset the backend database, delete `backend/wonderofyou.db` and restart the Flask server.
 
 For local development, run the backend and frontend concurrently in separate terminals.

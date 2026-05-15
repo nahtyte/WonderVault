@@ -3,8 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Lock, Mail, User, Eye, EyeOff } from 'lucide-react';
 
 interface AuthPageProps {
-  onLogin: (username: string, password: string) => void;
-  onRegister: (username: string, email: string, password: string) => void;
+  onLogin: (username: string, password: string) => Promise<void>;
+  onRegister: (username: string, email: string, password: string) => Promise<void>;
 }
 
 export default function AuthPage({ onLogin, onRegister }: AuthPageProps) {
@@ -34,7 +34,7 @@ export default function AuthPage({ onLogin, onRegister }: AuthPageProps) {
       if (!loginUsername || !loginPassword) {
         throw new Error('Please fill in all fields');
       }
-      onLogin(loginUsername, loginPassword);
+      await onLogin(loginUsername, loginPassword);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -64,17 +64,17 @@ export default function AuthPage({ onLogin, onRegister }: AuthPageProps) {
         throw new Error('Please enter a valid email');
       }
 
-      onRegister(registerUsername, registerEmail, registerPassword);
-      
+      await onRegister(registerUsername, registerEmail, registerPassword);
+
       // Show success popup and redirect to login
       setShowSuccessPopup(true);
-      
+
       // Reset form
       setRegisterUsername('');
       setRegisterEmail('');
       setRegisterPassword('');
       setConfirmPassword('');
-      
+
       // Redirect to login after animation
       setTimeout(() => {
         setShowSuccessPopup(false);
@@ -107,7 +107,7 @@ export default function AuthPage({ onLogin, onRegister }: AuthPageProps) {
               <Lock className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">WonderVault</h1>
+              <h1 className="text-2xl font-bold text-white">Wonder Of You</h1>
               <p className="text-sm text-slate-400">Secure Password Manager</p>
             </div>
           </motion.div>

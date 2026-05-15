@@ -92,7 +92,7 @@ export default function VaultView({
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.96, opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="w-full max-w-3xl rounded-[2rem] border border-slate-800 bg-slate-950/95 p-6 shadow-[0_40px_100px_rgba(0,0,0,0.35)]"
+              className="w-full max-w-3xl max-h-[90vh] overflow-auto rounded-[2rem] border border-slate-800 bg-slate-950/95 p-6 shadow-[0_40px_100px_rgba(0,0,0,0.35)]"
             >
               <CredentialForm onCancel={onCloseForm} onSave={onSaveCredential} />
             </motion.div>

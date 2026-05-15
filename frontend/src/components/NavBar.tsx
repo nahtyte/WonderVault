@@ -24,7 +24,7 @@ export default function NavBar({ activeTab, onChange, darkMode, onToggleTheme, u
             <Shield size={20} />
           </div>
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-slate-500">SecureVault</p>
+            <p className="text-sm uppercase tracking-[0.24em] text-slate-500">WonderOfYou</p>
             <p className="text-sm text-slate-300">AES-256-GCM · PBKDF2 · RSA-2048</p>
           </div>
         </div>

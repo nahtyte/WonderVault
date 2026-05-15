@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, ShieldAlert, Lock, Clock3, TrendingUp, Shield } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Lock, Clock3, TrendingUp, Shield, RefreshCw } from 'lucide-react';
 
 type SecurityDashboardProps = {
   stats: {
@@ -27,6 +28,57 @@ const mapVariant = {
 };
 
 export default function SecurityDashboard({ stats, activity }: SecurityDashboardProps) {
+  const [lastLogin, setLastLogin] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchDashboardData = async () => {
+    try {
+      setRefreshing(true);
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.error('No auth token found');
+        return;
+      }
+
+      const response = await fetch('/api/dashboard', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
+
+      const data = await response.json();
+
+      // Format and display last login
+      if (data.last_login) {
+        const loginDate = new Date(data.last_login);
+        const formatted = loginDate.toLocaleString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        setLastLogin(formatted);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
   const scoreColor = stats.score >= 90 ? 'from-emerald-400 via-emerald-400 to-slate-800' : stats.score >= 70 ? 'from-sky-500 via-sky-500 to-slate-800' : 'from-amber-400 via-amber-400 to-slate-800';
 
   return (
@@ -38,7 +90,16 @@ export default function SecurityDashboard({ stats, activity }: SecurityDashboard
               <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Security Dashboard</p>
               <h1 className="mt-3 text-3xl font-semibold text-slate-100">Real-time analysis of your vault’s security posture</h1>
             </div>
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-slate-300">Refresh</div>
+            <motion.button
+              onClick={fetchDashboardData}
+              disabled={refreshing}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="rounded-3xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+              Refresh
+            </motion.button>
           </div>
 
           <div className="mt-10 grid gap-5 lg:grid-cols-2">
@@ -48,8 +109,8 @@ export default function SecurityDashboard({ stats, activity }: SecurityDashboard
                   <ShieldCheck size={18} />
                 </span>
                 <div>
-                  <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Vault Encryption Active</p>
-                  <p className="mt-2 text-sm text-slate-400">AES-256-GCM · RSA-2048-OAEP</p>
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Vault Encryption Active</p>
+                  <p className="mt-2 text-xs text-slate-400">AES-256-GCM · RSA-2048-OAEP</p>
                   <p className="mt-1 text-xs text-slate-500">KDF: PBKDF2-SHA256 (100,000 iterations)</p>
                 </div>
               </div>
@@ -61,8 +122,8 @@ export default function SecurityDashboard({ stats, activity }: SecurityDashboard
                   <Clock3 size={18} />
                 </span>
                 <div>
-                  <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Last Successful Login</p>
-                  <p className="mt-2 text-sm text-slate-400">14/05/2569 21:11:11</p>
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Last Successful Login</p>
+                  <p className="mt-2 text-xs text-slate-400">{lastLogin || 'Loading...'}</p>
                 </div>
               </div>
             </div>

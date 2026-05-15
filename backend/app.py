@@ -9,7 +9,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wonderofvault.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wonderofyou.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'super-secret-vault-key-2026' # Change in production
 
@@ -36,16 +36,27 @@ def token_required(f):
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.json
+
+    # Validate required fields
+    if not data or not data.get('email') or not data.get('password') or not data.get('username'):
+        return jsonify({'message': 'Missing required fields: email, password, username'}), 400
+
+    # Check if email already exists
     if User.query.filter_by(email=data['email']).first():
-        return jsonify({'message': 'User already exists'}), 400
+        return jsonify({'message': 'Email already registered'}), 400
+
+    # Check if username already exists
+    if User.query.filter_by(username=data['username']).first():
+        return jsonify({'message': 'Username already taken'}), 400
 
     # 1. Hash master password (bcrypt)
     hashed_pwd = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    
+
     # 2. Setup RSA for Hybrid Encryption
     priv_pem, pub_pem = CryptoService.generate_rsa_keypair()
 
     new_user = User(
+        username=data['username'],
         email=data['email'],
         password_hash=hashed_pwd,
         rsa_public_key=pub_pem.decode('utf-8'),
@@ -58,16 +69,81 @@ def register():
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
+
+    # Validate required fields
+    if not data or not data.get('email') or not data.get('password'):
+        return jsonify({'message': 'Missing required fields: email, password'}), 400
+
     user = User.query.filter_by(email=data['email']).first()
-    
+
     if user and bcrypt.checkpw(data['password'].encode('utf-8'), user.password_hash.encode('utf-8')):
+        # Update last login time
+        user.last_login = datetime.datetime.utcnow()
+        db.session.commit()
+
         token = jwt.encode({
             'user_id': user.id,
             'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
         }, app.config['SECRET_KEY'], algorithm="HS256")
-        return jsonify({'token': token, 'email': user.email})
-    
-    return jsonify({'message': 'Invalid credentials'}), 401
+        return jsonify({
+            'token': token,
+            'email': user.email,
+            'username': user.username,
+            'last_login': user.last_login.isoformat()
+        }), 200
+
+    return jsonify({'message': 'Invalid email or password'}), 401
+
+# --- Dashboard Route ---
+@app.route('/api/dashboard', methods=['GET'])
+@token_required
+def dashboard(current_user):
+    creds = Credential.query.filter_by(user_id=current_user.id).all()
+
+    # Calculate stats
+    total = len(creds)
+    weak = 0
+    reused = 0
+    strong = 0
+
+    # For now, return basic stats (in a real app, you'd analyze passwords)
+    for c in creds:
+        try:
+            wrapped_key = base64.b64decode(c.encrypted_key)
+            aes_key = CryptoService.rsa_decrypt(current_user.rsa_private_key.encode('utf-8'), wrapped_key)
+            decrypted_json = CryptoService.aes_gcm_decrypt(aes_key, c.nonce, c.ciphertext, c.tag)
+            data = json.loads(decrypted_json.decode('utf-8'))
+            password = data.get('password', '')
+
+            # Simple strength check
+            has_upper = any(c.isupper() for c in password)
+            has_lower = any(c.islower() for c in password)
+            has_num = any(c.isdigit() for c in password)
+            has_special = any(not c.isalnum() for c in password)
+
+            if len(password) >= 12 and has_upper and has_lower and has_num and has_special:
+                strong += 1
+            elif len(password) >= 8:
+                strong += 1
+            else:
+                weak += 1
+        except:
+            pass
+
+    score = max(32, 100 - weak * 16 - reused * 10)
+
+    return jsonify({
+        'stats': {
+            'total': total,
+            'weak': weak,
+            'reused': reused,
+            'strong': strong,
+            'score': score
+        },
+        'last_login': current_user.last_login.isoformat() if current_user.last_login else None,
+        'email': current_user.email,
+        'username': current_user.username
+    }), 200
 
 # --- Credential CRUD ---
 @app.route('/api/credentials', methods=['POST'])
@@ -92,7 +168,7 @@ def add_credential(current_user):
     )
     db.session.add(new_cred)
     db.session.commit()
-    return jsonify({'message': 'Stored securely'})
+    return jsonify({'message': 'Stored securely', 'id': new_cred.id}), 201
 
 @app.route('/api/credentials', methods=['GET'])
 @token_required
@@ -103,13 +179,13 @@ def get_credentials(current_user):
         # Unwrap AES key with RSA Private Key
         wrapped_key = base64.b64decode(c.encrypted_key)
         aes_key = CryptoService.rsa_decrypt(current_user.rsa_private_key.encode('utf-8'), wrapped_key)
-        
+
         # Decrypt payload with AES-GCM
         decrypted_json = CryptoService.aes_gcm_decrypt(aes_key, c.nonce, c.ciphertext, c.tag)
         data = json.loads(decrypted_json.decode('utf-8'))
         data['id'] = c.id
         output.append(data)
-    
+
     return jsonify(output)
 
 @app.route('/api/credentials/<int:id>', methods=['DELETE'])
@@ -118,7 +194,7 @@ def delete_credential(current_user, id):
     cred = Credential.query.filter_by(id=id, user_id=current_user.id).first()
     if not cred:
         return jsonify({'message': 'Credential not found'}), 404
-    
+
     db.session.delete(cred)
     db.session.commit()
     return jsonify({'message': 'Credential deleted successfully'})

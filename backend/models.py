@@ -5,10 +5,12 @@ db = SQLAlchemy()
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(120), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     rsa_public_key = db.Column(db.Text, nullable=False)
     rsa_private_key = db.Column(db.Text, nullable=False)
+    last_login = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 class Credential(db.Model):
     id = db.Column(db.Integer, primary_key=True)

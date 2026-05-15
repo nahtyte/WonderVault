@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Starting WonderVault..."
+echo "🚀 Starting Wonder Of You..."
 
 if [ ! -d "backend/venv" ]; then
   echo "📦 Backend environment not found. Bootstrapping..."
@@ -41,7 +41,7 @@ npm run dev &
 FRONTEND_PID=$!
 cd ..
 
-echo "✅ WonderVault is starting."
+echo "✅ Wonder Of You is starting."
 echo "Backend PID: $BACKEND_PID"
 echo "Frontend PID: $FRONTEND_PID"
 echo "Press Ctrl+C to stop both processes."

@@ -101,56 +101,179 @@ export default function App() {
     return { total, weak, reused, strong, score };
   }, [credentials]);
 
-  const handleSaveCredential = (payload: CredentialPayload) => {
-    const strength = getPasswordStrength(payload.password);
-    const nextCredential: Credential = {
-      id: `${Date.now()}`,
-      website: payload.website,
-      username: payload.username,
-      password: payload.password,
-      notes: payload.notes,
-      createdAt: new Date().toLocaleString('en-GB', { hour12: false }),
-      strength,
-      reused: false,
-    };
+  const handleSaveCredential = async (payload: CredentialPayload) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
-    setCredentials((current) => [nextCredential, ...current]);
-    setActivity((current) => [
-      {
-        id: `${Date.now()}-activity`,
-        title: `Encrypted credential for ${payload.website}`,
-        description: `Added to vault • ${new Date().toLocaleString('en-GB', { hour12: false })}`,
-        variant: 'success',
-      },
-      ...current,
-    ]);
-    setShowForm(false);
-    setActiveTab('vault');
+      if (!response.ok) {
+        throw new Error('Failed to save credential');
+      }
+
+      const result = await response.json();
+      const strength = getPasswordStrength(payload.password);
+      const nextCredential: Credential = {
+        id: result.id ? result.id.toString() : `${Date.now()}`,
+        website: payload.website,
+        username: payload.username,
+        password: payload.password,
+        notes: payload.notes,
+        createdAt: new Date().toLocaleString('en-GB', { hour12: false }),
+        strength,
+        reused: false,
+      };
+
+      setCredentials((current) => [nextCredential, ...current]);
+      setActivity((current) => [
+        {
+          id: `${Date.now()}-activity`,
+          title: `Encrypted credential for ${payload.website}`,
+          description: `Added to vault • ${new Date().toLocaleString('en-GB', { hour12: false })}`,
+          variant: 'success',
+        },
+        ...current,
+      ]);
+      setShowForm(false);
+      setActiveTab('vault');
+    } catch (error) {
+      console.error('Error saving credential:', error);
+      alert('Failed to save credential. Please try again.');
+    }
   };
 
-  const handleLogin = (username: string, password: string) => {
-    // TODO: Implement backend authentication
-    setUser({ username });
-    setIsAuthenticated(true);
+  const fetchCredentials = async (token: string) => {
+    try {
+      const response = await fetch('/api/credentials', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch credentials');
+      }
+
+      const data = await response.json();
+      const credentials = data.map((cred: any) => ({
+        id: cred.id.toString(),
+        website: cred.website,
+        username: cred.username,
+        password: cred.password,
+        notes: cred.notes || '',
+        createdAt: cred.createdAt || new Date().toLocaleString('en-GB', { hour12: false }),
+        strength: cred.strength || 'medium',
+        reused: cred.reused || false,
+      }));
+      setCredentials(credentials);
+    } catch (error) {
+      console.error('Error fetching credentials:', error);
+    }
   };
 
-  const handleRegister = (username: string, email: string, password: string) => {
-    // TODO: Implement backend registration
-    setUser({ username, email });
-    setIsAuthenticated(true);
+  const handleLogin = async (username: string, password: string) => {
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: username, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('userEmail', data.email);
+
+      setUser({ username: data.email, email: data.email });
+      setIsAuthenticated(true);
+
+      // Fetch credentials after login
+      await fetchCredentials(data.token);
+    } catch (error) {
+      throw error;
+    }
   };
 
-  const handleDeleteCredential = (id: string) => {
-    setCredentials((current) => current.filter((item) => item.id !== id));
-    setActivity((current) => [
-      {
-        id: `${Date.now()}-activity`,
-        title: 'Deleted credential',
-        description: `Removed credential • ${new Date().toLocaleString('en-GB', { hour12: false })}`,
-        variant: 'warning',
-      },
-      ...current,
-    ]);
+  const handleRegister = async (username: string, email: string, password: string) => {
+    try {
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Registration failed');
+      }
+
+      // After successful registration, automatically log in
+      const loginResponse = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!loginResponse.ok) {
+        const errorData = await loginResponse.json();
+        throw new Error(errorData.message || 'Auto-login failed');
+      }
+
+      const data = await loginResponse.json();
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('userEmail', data.email);
+
+      setUser({ username: data.email, email: data.email });
+      setIsAuthenticated(true);
+
+      // Fetch credentials after successful registration and auto-login
+      await fetchCredentials(data.token);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handleDeleteCredential = async (id: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/credentials/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete credential');
+      }
+
+      setCredentials((current) => current.filter((item) => item.id !== id));
+      setActivity((current) => [
+        {
+          id: `${Date.now()}-activity`,
+          title: 'Deleted credential',
+          description: `Removed credential • ${new Date().toLocaleString('en-GB', { hour12: false })}`,
+          variant: 'warning',
+        },
+        ...current,
+      ]);
+    } catch (error) {
+      console.error('Error deleting credential:', error);
+      alert('Failed to delete credential. Please try again.');
+    }
   };
 
   const handleLogout = () => {
